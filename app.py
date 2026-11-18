@@ -1,4 +1,6 @@
-﻿import tempfile  # Import tempfile so uploaded videos can be stored as temporary files for inference.
+﻿import subprocess  # Run ffmpeg to convert uploads into a format browsers can play.
+
+import tempfile  # Import tempfile so uploaded videos can be stored as temporary files for inference.
 from pathlib import Path  # Import Path to handle uploaded file names and temporary file names cleanly.
 
 import streamlit as st  # Import Streamlit for the interactive upload and results dashboard.
@@ -17,6 +19,26 @@ def get_model():  # Return a cached shared model instance for the app.
     return load_model()  # Load the trained model from disk once and reuse it.
 
 
+def make_browser_playable(src_path: Path) -> bytes:  # Convert any upload to H.264 MP4 so the in-browser preview always plays.
+    out_path = src_path.with_name(src_path.stem + "_web.mp4")  # Temporary converted file next to the original.
+    try:
+        import imageio_ffmpeg  # Bundled ffmpeg binary, so no separate ffmpeg install is needed.
+
+        cmd = [
+            imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-i", str(src_path),
+            "-vf", "scale='min(854,iw)':-2",  # Cap the width at 854px and keep dimensions even for H.264.
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-movflags", "+faststart", str(out_path),
+        ]
+        subprocess.run(cmd, check=True, capture_output=True, timeout=180)  # Run the conversion.
+        return out_path.read_bytes()  # Return the converted bytes for st.video.
+    except Exception:  # If conversion fails for any reason, fall back to the original file.
+        return src_path.read_bytes()
+    finally:
+        if out_path.exists():
+            out_path.unlink()  # Remove the temporary converted file.
+
+
 st.title("Videos robbery detection")  # Show the main page title for the app.
 st.caption("Upload a video, run the robbery detector, and view the prediction confidence score.")  # Add a short description so the user knows what the uploader does.
 
@@ -31,7 +53,7 @@ if uploaded_file is not None:  # Only run inference when the user actually selec
             temp_file.write(uploaded_file.getvalue())  # Save the uploaded video bytes to disk.
             temp_path = Path(temp_file.name)  # Store the file path for preprocessing and display.
 
-        st.video(str(temp_path))  # Render the uploaded video in the app so the user can confirm the clip they selected.
+        st.video(make_browser_playable(temp_path), format="video/mp4")  # Show a browser-playable copy of the upload.
 
         with st.spinner("Processing video..."):  # Show a loading indicator while the model analyzes the clip.
             model = get_model()  # Retrieve the cached model instance.

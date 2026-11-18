@@ -12,7 +12,7 @@ from huggingface_hub import hf_hub_download  # Import the helper that downloads 
 BASE_DIR = Path(__file__).resolve().parent  # Resolve the directory containing this script so model and test paths stay stable.
 MODEL_FILENAME = "robbery_r3d18_test.pth"  # Name of the weight file, same as the file uploaded to Hugging Face.
 MODEL_PATH = BASE_DIR / MODEL_FILENAME  # Set the path to the trained checkpoint used for inference.
-HF_REPO_ID = "Rafay1337/robbery-r3d18"  # Hugging Face repo that stores the model weights.
+HF_REPO_ID = "RabiaSarwar/robbery-r3d18"  # Hugging Face repo that stores the model weights.
 CLASSES = ["normal", "robbery"]  # Define the expected output labels for the binary classification task.
 NUM_FRAMES = 16  # Sample a fixed number of frames from each video to create a compact, consistent input tensor.
 IMAGE_SIZE = 112  # Resize each frame to 112x112 to match the model's expected input size.
