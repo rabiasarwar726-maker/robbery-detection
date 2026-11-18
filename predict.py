@@ -1,4 +1,5 @@
-﻿import cv2  # Import OpenCV for reading and decoding video frames from uploaded or local clips.
+﻿import os  # Import os so environment variables (like HF_TOKEN) can be read.
+import cv2  # Import OpenCV for reading and decoding video frames from uploaded or local clips.
 import torch  # Import PyTorch for tensor operations and model inference.
 import torch.nn as nn  # Import the neural network module helpers used to rebuild the output classifier.
 import numpy as np  # Import NumPy for frame normalization, array sampling, and probability handling.
@@ -6,9 +7,12 @@ import numpy as np  # Import NumPy for frame normalization, array sampling, and 
 import sys  # Import sys so the script can read CLI arguments when run from a terminal.
 from pathlib import Path  # Import Path for robust file and directory path handling.
 from torchvision.models.video import r3d_18  # Import the 3D ResNet-18 model used for video classification.
+from huggingface_hub import hf_hub_download  # Import the helper that downloads the model weights from Hugging Face.
 
 BASE_DIR = Path(__file__).resolve().parent  # Resolve the directory containing this script so model and test paths stay stable.
-MODEL_PATH = BASE_DIR / "robbery_r3d18_test.pth"  # Set the path to the trained checkpoint used for inference.
+MODEL_FILENAME = "robbery_r3d18_test.pth"  # Name of the weight file, same as the file uploaded to Hugging Face.
+MODEL_PATH = BASE_DIR / MODEL_FILENAME  # Set the path to the trained checkpoint used for inference.
+HF_REPO_ID = "Rafay1337/robbery-r3d18"  # Hugging Face repo that stores the model weights.
 CLASSES = ["normal", "robbery"]  # Define the expected output labels for the binary classification task.
 NUM_FRAMES = 16  # Sample a fixed number of frames from each video to create a compact, consistent input tensor.
 IMAGE_SIZE = 112  # Resize each frame to 112x112 to match the model's expected input size.
@@ -18,7 +22,23 @@ device = torch.device("cpu")  # Force inference onto CPU for maximum compatibili
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".wmv", ".webm"}  # Define the file types supported when scanning a directory for test videos.
 
 
+def ensure_model():  # Download the model weights from Hugging Face if they are not already on disk.
+    if MODEL_PATH.is_file():  # If the file already exists (e.g. on your own PC), skip the download.
+        return  # Nothing to do.
+
+    print("Model file not found locally. Downloading from Hugging Face...")  # Tell the logs that a download is starting.
+    hf_hub_download(  # Download the file from the Hugging Face repo.
+        repo_id=HF_REPO_ID,  # The repo that holds the weights.
+        filename=MODEL_FILENAME,  # The exact file name inside the repo.
+        local_dir=str(BASE_DIR),  # Save it next to this script so MODEL_PATH finds it.
+        token=os.getenv("HF_TOKEN"),  # Read token from the HF_TOKEN environment variable (needed for private repos).
+    )
+    print("Model downloaded.")  # Confirm the download finished.
+
+
 def load_model():  # Load the saved model weights and return the ready-to-use network.
+    ensure_model()  # Make sure the weight file exists, downloading it first if needed.
+
     if not MODEL_PATH.is_file():  # Check whether the model checkpoint exists before trying to load it.
         raise FileNotFoundError(f"Model not found: {MODEL_PATH}")  # Raise a clear error if the weight file is missing.
 
